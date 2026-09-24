@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Gradebook — Smart Semester GPA &amp; Target Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>The Gradebook</h1>
+      <div class="tag">Smart Semester GPA &amp; Target Planner</div>
+    </div>
+    <div class="scale-note">4.0 scale · edit under Setup</div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="active" data-tab="setup">1 · Setup</button>
+    <button data-tab="courses">2 · This Semester</button>
+    <button data-tab="target">3 · Target Planner</button>
+    <button data-tab="chart">4 · Trajectory</button>
+  </nav>
+
+  <!-- TAB 1: SETUP -->
+  <section class="panel active" id="tab-setup">
+    <div class="card">
+      <h2><span class="idx">§</span> Academic record so far</h2>
+      <div class="grid g2">
+        <div><label for="curCGPA">Current cumulative GPA (CGPA)</label><input type="number" id="curCGPA" step="0.01" min="0" max="4" value="3.30"></div>
+        <div><label for="curCredits">Total credit hours completed</label><input type="number" id="curCredits" step="1" min="0" value="60"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="idx">§</span> Grading scale</h2>
+      <table id="scaleTable">
+        <thead><tr><th>Letter</th><th>Points</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:10px; font-size:.78rem; color:var(--ink-soft);">Edit any point value — the whole tool recalculates from this scale.</div>
+    </div>
+  </section>
+
+  <!-- TAB 2: COURSES -->
+  <section class="panel" id="tab-courses">
+    <div class="card">
+      <h2><span class="idx">§</span> Upcoming / in-progress courses</h2>
+      <div class="grid" style="margin-bottom:8px;">
+        <div class="grid g4" id="courseHead">
+          <label>Course name</label><label>Credit hrs</label><label>Grade</label><label></label>
+        </div>
+      </div>
+      <div id="courseRows"></div>
+      <button class="btn ghost small" id="addCourse" style="margin-top:8px;">+ Add course</button>
+      <div class="stat-row" style="margin-top:16px;">
+        <div class="stat"><div class="v num" id="sgpaOut">—</div><div class="l">Semester GPA (SGPA)</div></div>
+        <div class="stat"><div class="v num" id="creditOut">—</div><div class="l">Credit hours this semester</div></div>
+        <div class="stat"><div class="v num" id="newCgpaOut">—</div><div class="l">Projected new CGPA</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 3: TARGET PLANNER -->
+  <section class="panel" id="tab-target">
+    <div class="card">
+      <h2><span class="idx">§</span> Set your goal</h2>
+      <div class="grid g2">
+        <div><label for="targetCGPA">Target CGPA</label><input type="number" id="targetCGPA" step="0.01" min="0" max="4" value="3.50"></div>
+        <div><label for="targetCredits">Upcoming semester credit hours</label><input type="number" id="targetCredits" step="1" min="1" value="15"></div>
+      </div>
+      <button class="btn" id="calcTarget" style="margin-top:14px;">Calculate required SGPA</button>
+      <div id="targetResult"></div>
+    </div>
+    <div class="card" id="comboCard" style="display:none;">
+      <h2><span class="idx">§</span> One way to get there</h2>
+      <div id="comboOut" style="font-size:.92rem;"></div>
+      <div style="font-size:.76rem; color:var(--ink-soft); margin-top:8px;">One valid combination among several — any mix averaging to the required SGPA across these credit hours works.</div>
+    </div>
+  </section>
+
+  <!-- TAB 4: TRAJECTORY -->
+  <section class="panel" id="tab-chart">
+    <div class="card">
+      <h2><span class="idx">§</span> Past semesters (optional)</h2>
+      <div style="font-size:.8rem; color:var(--ink-soft); margin-bottom:8px;">Enter your CGPA at the end of each completed semester, oldest first — leave blank to skip.</div>
+      <div id="pastRows" class="grid g2"></div>
+    </div>
+    <div class="card">
+      <h2><span class="idx">§</span> CGPA trajectory</h2>
+      <div class="chart-box"><canvas id="trajChart"></canvas></div>
+      <div id="chartNote" class="alert info" style="margin-top:14px;"></div>
+    </div>
+  </section>
+
+  <footer class="note">Everything runs locally in your browser — nothing is uploaded. Refreshing keeps your last session on this device.</footer>
+</div>
+
+
+<!-- Modules load in dependency order: logic (pure math) -> chart (needs logic) -> ui (needs both) -->
+<script src="logic.js"></script>
+<script src="chart.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
+
+
+  :root{
+    --ink:#1c2a3a; --ink-soft:#3c4d63; --paper:#f6f2e8; --paper-2:#efe9db;
+    --line:#d8cfb8; --gold:#9c7a2e; --gold-2:#c79a3d; --good:#2f6f4e; --bad:#a5402a;
+    --white:#fffdf7;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#eae3d2; --ink-soft:#b9c2d0; --paper:#171c24; --paper-2:#1f2630;
+      --line:#333c4a; --gold:#d3ab55; --gold-2:#e8c777; --good:#5fae82; --bad:#e07a5f; --white:#1c222c;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#eae3d2; --ink-soft:#b9c2d0; --paper:#171c24; --paper-2:#1f2630;
+    --line:#333c4a; --gold:#d3ab55; --gold-2:#e8c777; --good:#5fae82; --bad:#e07a5f; --white:#1c222c;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+    line-height:1.5;
+  }
+  h1,h2,h3,.serif{font-family:'Lora', Georgia, 'Times New Roman', serif;}
+  .num{font-variant-numeric: tabular-nums; font-feature-settings:"tnum";}
+  .wrap{max-width:980px; margin:0 auto; padding:28px 20px 60px;}
+  header.top{display:flex; align-items:baseline; justify-content:space-between; gap:16px; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:22px; flex-wrap:wrap;}
+  header.top h1{font-size:1.6rem; font-weight:700; margin:0; letter-spacing:.2px;}
+  header.top .tag{color:var(--ink-soft); font-size:.85rem; margin-top:3px;}
+  .scale-note{font-size:.8rem; color:var(--ink-soft); text-align:right;}
+
+  nav.tabs{display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:24px; overflow-x:auto;}
+  nav.tabs button{
+    background:none; border:none; cursor:pointer; padding:10px 16px; font-family:'Lora',serif;
+    font-size:.95rem; color:var(--ink-soft); border-bottom:2px solid transparent; white-space:nowrap;
+  }
+  nav.tabs button.active{color:var(--ink); border-bottom-color:var(--gold); font-weight:600;}
+  nav.tabs button:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+
+  section.panel{display:none;}
+  section.panel.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+
+  .card{background:var(--white); border:1px solid var(--line); border-radius:3px; padding:18px 20px; margin-bottom:16px;}
+  .card h2{font-size:1.05rem; margin:0 0 14px; display:flex; align-items:baseline; gap:8px;}
+  .card h2 .idx{color:var(--gold); font-weight:700;}
+  .grid{display:grid; gap:12px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g4{grid-template-columns:2fr 1fr 1fr auto;}
+  @media(max-width:640px){ .g4{grid-template-columns:1fr 1fr;} .g2{grid-template-columns:1fr;} }
+
+  label{display:block; font-size:.78rem; color:var(--ink-soft); margin-bottom:4px;}
+  input,select{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:2px;
+    background:var(--paper); color:var(--ink); font-family:inherit; font-size:.92rem;
+  }
+  input:focus,select:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  input[type=number]{font-variant-numeric: tabular-nums;}
+
+  .btn{
+    background:var(--ink); color:var(--white); border:none; padding:9px 16px; border-radius:2px;
+    cursor:pointer; font-family:'Lora',serif; font-size:.88rem; font-weight:600;
+  }
+  .btn:hover{background:var(--gold);}
+  .btn.ghost{background:none; color:var(--ink); border:1px solid var(--line);}
+  .btn.ghost:hover{border-color:var(--gold); color:var(--gold);}
+  .btn.small{padding:6px 10px; font-size:.8rem;}
+  .btn.danger{background:none; color:var(--bad); border:1px solid var(--bad); padding:6px 9px; font-size:.78rem;}
+
+  table{width:100%; border-collapse:collapse; font-size:.9rem;}
+  th{text-align:left; font-family:'Lora',serif; font-weight:600; font-size:.78rem; color:var(--ink-soft); padding:6px 8px; border-bottom:1px solid var(--line);}
+  td{padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:4px;}
+  .stat{background:var(--paper-2); border-left:3px solid var(--gold); padding:12px 14px; border-radius:2px;}
+  .stat .v{font-family:'Lora',serif; font-size:1.5rem; font-weight:700;}
+  .stat .l{font-size:.75rem; color:var(--ink-soft); margin-top:2px;}
+
+  .alert{padding:12px 14px; border-radius:2px; font-size:.88rem; margin-top:10px; border-left:3px solid;}
+  .alert.good{background:color-mix(in srgb, var(--good) 12%, var(--white)); border-color:var(--good); color:var(--good);}
+  .alert.bad{background:color-mix(in srgb, var(--bad) 12%, var(--white)); border-color:var(--bad); color:var(--bad);}
+  .alert.info{background:var(--paper-2); border-color:var(--ink-soft); color:var(--ink);}
+
+  .chart-box{position:relative; height:340px;}
+  footer.note{color:var(--ink-soft); font-size:.78rem; margin-top:30px; border-top:1px solid var(--line); padding-top:14px;}
+
+
+
+/* ============================================================
+   logic.js — Math / Logic Engine
+   Pure functions only: no DOM access, so this file can be reused
+   as-is in Node, a test suite, or a different front end.
+   ============================================================ */
+(function (global) {
+  "use strict";
+
+  // Default 4.0 grading scale (mutable — the UI edits this object directly)
+  const scale = {
+    A: 4.0, "A-": 3.7, "B+": 3.3, B: 3.0, "B-": 2.7,
+    "C+": 2.3, C: 2.0, "C-": 1.7, "D+": 1.3, D: 1.0, F: 0.0
+  };
+
+  /** Semester GPA from a list of {credits, grade} against the current scale. */
+  function calcSGPA(courses) {
+    let totCred = 0, totPts = 0;
+    courses.forEach(c => {
+      totCred += c.credits;
+      totPts += c.credits * (scale[c.grade] ?? 0);
+    });
+    return { sgpa: totCred > 0 ? totPts / totCred : NaN, totalCredits: totCred };
+  }
+
+  /** New cumulative GPA after folding in one semester's SGPA. */
+  function calcCGPA(curCGPA, curCredits, sgpa, newCredits) {
+    const totalCredits = curCredits + newCredits;
+    if (totalCredits <= 0) return NaN;
+    return (curCGPA * curCredits + (isFinite(sgpa) ? sgpa : 0) * newCredits) / totalCredits;
+  }
+
+  /** Minimum SGPA needed this semester to hit a target CGPA. Can exceed 4.0 (infeasible). */
+  function requiredSGPA(curCGPA, curCredits, target, newCredits) {
+    if (newCredits <= 0) return NaN;
+    return (target * (curCredits + newCredits) - curCGPA * curCredits) / newCredits;
+  }
+
+  /** How many future semesters (each at a perfect 4.0 SGPA) are needed to reach target. */
+  function minSemestersToTarget(curCGPA, curCredits, target, semCredits) {
+    let cgpa = curCGPA, credits = curCredits, sems = 0;
+    while (cgpa < target && sems < 30) {
+      cgpa = calcCGPA(cgpa, credits, 4.0, semCredits);
+      credits += semCredits;
+      sems++;
+    }
+    return sems;
+  }
+
+  /**
+   * Suggest one valid combination of letter grades (in credit-sized blocks)
+   * that averages to the required SGPA across totalCredits. Greedy best-fit;
+   * not the only valid combination, just a demonstrably achievable one.
+   */
+  function suggestCombo(requiredSgpa, totalCredits) {
+    if (requiredSgpa > 4.0 + 1e-9) return null;
+    const letters = Object.entries(scale).sort((a, b) => b[1] - a[1]);
+    const blockSize = totalCredits >= 12 ? 3 : Math.max(1, Math.round(totalCredits / 4));
+    const numBlocks = Math.max(1, Math.round(totalCredits / blockSize));
+
+    let remaining = totalCredits, targetPts = requiredSgpa * totalCredits, combo = [];
+    for (let i = 0; i < numBlocks; i++) {
+      const cred = (i === numBlocks - 1) ? remaining : blockSize;
+      remaining -= cred;
+      let best = null, bestDiff = Infinity;
+      for (const [letter, pts] of letters) {
+        const used = pts * cred;
+        const remainingPtsNeeded = targetPts - used;
+        const avgNeeded = remaining > 0 ? remainingPtsNeeded / remaining : 0;
+        const feasible = remaining === 0 || (avgNeeded >= 0 && avgNeeded <= 4.0);
+        if (feasible) {
+          const diff = Math.abs(remainingPtsNeeded - (remaining > 0 ? avgNeeded * remaining : 0));
+          if (diff < bestDiff) { bestDiff = diff; best = letter; }
+        }
+      }
+      if (!best) best = letters[0][0];
+      combo.push({ letter: best, credits: cred });
+      targetPts -= scale[best] * cred;
+    }
+    return combo;
+  }
+
+  global.GradebookLogic = { scale, calcSGPA, calcCGPA, requiredSGPA, minSemestersToTarget, suggestCombo };
+})(window);
+
+
+
+/* ============================================================
+   chart.js — Chart Rendering Engine
+   Builds the "past semesters" inputs and draws the CGPA
+   trajectory (historical / projected / target-threshold) with Chart.js.
+   ============================================================ */
+(function () {
+  "use strict";
+  const L = window.GradebookLogic;
+  const $ = s => document.querySelector(s);
+  const fmt = n => (isFinite(n) ? n.toFixed(2) : "—");
+  let chartInstance = null;
+
+  function buildPastRows() {
+    const wrap = $('#pastRows'); wrap.innerHTML = '';
+    for (let i = 1; i <= 7; i++) {
+      const div = document.createElement('div');
+      div.innerHTML = `<label for="past${i}">Semester ${i} CGPA</label><input type="number" step="0.01" min="0" max="4" id="past${i}">`;
+      wrap.appendChild(div);
+    }
+    wrap.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => window.Gradebook.save()));
+  }
+
+  function render() {
+    const curCGPA = parseFloat($('#curCGPA').value) || 0;
+    const target = parseFloat($('#targetCGPA').value) || 0;
+    const semCredits = parseFloat($('#targetCredits').value) || 15;
+    const curCredits = parseFloat($('#curCredits').value) || 0;
+
+    const past = [];
+    for (let i = 1; i <= 7; i++) { const v = parseFloat($('#past' + i)?.value); past.push(isFinite(v) ? v : null); }
+    let lastFilled = 0; past.forEach((v, i) => { if (v != null) lastFilled = i + 1; });
+    const curSemIndex = lastFilled + 1;
+    const labels = Array.from({ length: 8 }, (_, i) => 'Sem ' + (i + 1));
+
+    const historical = new Array(8).fill(null);
+    past.forEach((v, i) => { if (v != null) historical[i] = v; });
+    if (curSemIndex <= 8) historical[curSemIndex - 1] = curCGPA;
+
+    // Projected: from the current point, apply the required SGPA each future term (capped at 4.0)
+    const projected = new Array(8).fill(null);
+    if (curSemIndex <= 8) projected[curSemIndex - 1] = curCGPA;
+    let cgpa = curCGPA, credits = curCredits;
+    for (let s = curSemIndex; s < 8; s++) {
+      const req = L.requiredSGPA(cgpa, credits, target, semCredits);
+      const applied = Math.min(4.0, Math.max(0, isFinite(req) ? req : 4.0));
+      cgpa = L.calcCGPA(cgpa, credits, applied, semCredits);
+      credits += semCredits;
+      projected[s] = cgpa;
+    }
+    const thresholdLine = new Array(8).fill(target);
+
+    const ctx = $('#trajChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+    const styles = getComputedStyle(document.body);
+    const ink = styles.getPropertyValue('--ink').trim() || '#1c2a3a';
+    const gold = styles.getPropertyValue('--gold').trim() || '#9c7a2e';
+    const bad = styles.getPropertyValue('--bad').trim() || '#a5402a';
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels, datasets: [
+          { label: 'Historical CGPA', data: historical, borderColor: ink, backgroundColor: ink, spanGaps: true, tension: .2, pointRadius: 4 },
+          { label: 'Projected path', data: projected, borderColor: gold, backgroundColor: gold, borderDash: [6, 4], spanGaps: true, tension: .2, pointRadius: 4 },
+          { label: 'Target threshold', data: thresholdLine, borderColor: bad, borderWidth: 1.5, pointRadius: 0, borderDash: [2, 3] }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 4, ticks: { stepSize: .5 }, grid: { color: 'rgba(128,128,128,.15)' } }, x: { grid: { display: false } } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, font: { family: "'Source Sans 3'" } } } }
+      }
+    });
+
+    const finalProjected = projected.filter(v => v != null).pop();
+    let note = '';
+    if (finalProjected != null) {
+      const hitIndex = projected.findIndex(v => v != null && v >= target - 0.005);
+      note = finalProjected >= target - 0.005
+        ? `At this pace, the projected path reaches the ${fmt(target)} target by semester ${hitIndex + 1 <= 8 ? hitIndex + 1 : 8}.`
+        : `Even projecting forward through semester 8, the path tops out around ${fmt(finalProjected)} — short of the ${fmt(target)} target. Consider extending your timeline or raising per-semester credit load.`;
+    }
+    $('#chartNote').textContent = note;
+  }
+
+  window.GradebookChart = { buildPastRows, render };
+})();
+
+
+
+/* ============================================================
+   ui.js — Interactive User Interface
+   Owns all DOM reads/writes, form handling, and localStorage
+   persistence. Delegates every calculation to logic.js.
+   ============================================================ */
+(function () {
+  "use strict";
+  const L = window.GradebookLogic;
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const fmt = n => (isFinite(n) ? n.toFixed(2) : "—");
+
+  // ---------- Tabs ----------
+  $$('nav.tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('nav.tabs button').forEach(b => b.classList.remove('active'));
+      $$('section.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      $('#tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'chart') window.GradebookChart.render();
+    });
+  });
+
+  // ---------- Grading scale ----------
+  function buildScaleTable() {
+    const tb = $('#scaleTable tbody'); tb.innerHTML = '';
+    Object.keys(L.scale).forEach(letter => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${letter}</td><td><input type="number" step="0.1" min="0" max="4" value="${L.scale[letter]}" data-letter="${letter}" style="max-width:100px;"></td>`;
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => {
+        L.scale[inp.dataset.letter] = parseFloat(inp.value) || 0;
+        refreshGradeSelects(); calcAndRenderSGPA(); save();
+      });
+    });
+  }
+  function gradeOptions(selected) {
+    return Object.keys(L.scale).map(l => `<option value="${l}" ${l === selected ? 'selected' : ''}>${l} — ${L.scale[l].toFixed(1)}</option>`).join('');
+  }
+  function refreshGradeSelects() {
+    $$('#courseRows select.gradeSel').forEach(sel => { const cur = sel.value; sel.innerHTML = gradeOptions(cur); });
+  }
+
+  // ---------- Course rows ----------
+  function addCourseRow(name = "", credits = 3, grade = "A") {
+    const row = document.createElement('div');
+    row.className = 'grid g4'; row.style.marginBottom = '6px';
+    row.innerHTML = `
+      <input type="text" class="cName" placeholder="e.g. Data Structures" value="${name}">
+      <input type="number" class="cCredits" min="0" max="6" step="1" value="${credits}">
+      <select class="gradeSel">${gradeOptions(grade)}</select>
+      <button class="btn danger" aria-label="Remove course">✕</button>`;
+    row.querySelectorAll('input,select').forEach(el => el.addEventListener('input', () => { calcAndRenderSGPA(); save(); }));
+    row.querySelector('button').addEventListener('click', () => { row.remove(); calcAndRenderSGPA(); save(); });
+    $('#courseRows').appendChild(row);
+  }
+  $('#addCourse').addEventListener('click', () => { addCourseRow(); save(); });
+
+  function getCourses() {
+    return $$('#courseRows > div').map(row => ({
+      name: row.querySelector('.cName').value || 'Untitled',
+      credits: parseFloat(row.querySelector('.cCredits').value) || 0,
+      grade: row.querySelector('.gradeSel').value
+    }));
+  }
+
+  function calcAndRenderSGPA() {
+    const { sgpa, totalCredits } = L.calcSGPA(getCourses());
+    $('#sgpaOut').textContent = fmt(sgpa);
+    $('#creditOut').textContent = totalCredits || '—';
+    const curCGPA = parseFloat($('#curCGPA').value) || 0;
+    const curCredits = parseFloat($('#curCredits').value) || 0;
+    $('#newCgpaOut').textContent = fmt(L.calcCGPA(curCGPA, curCredits, sgpa, totalCredits));
+    return { sgpa, totalCredits };
+  }
+
+  // ---------- Target planner ----------
+  $('#calcTarget').addEventListener('click', () => {
+    const curCGPA = parseFloat($('#curCGPA').value) || 0;
+    const curCredits = parseFloat($('#curCredits').value) || 0;
+    const target = parseFloat($('#targetCGPA').value) || 0;
+    const newCredits = parseFloat($('#targetCredits').value) || 0;
+    const req = L.requiredSGPA(curCGPA, curCredits, target, newCredits);
+    const box = $('#targetResult'), comboCard = $('#comboCard'), comboOut = $('#comboOut');
+
+    if (req <= 0) {
+      box.innerHTML = `<div class="alert good">You're already at or above your target — any non-negative SGPA keeps you there.</div>`;
+      comboCard.style.display = 'none';
+    } else if (req > 4.0) {
+      const minSem = L.minSemestersToTarget(curCGPA, curCredits, target, newCredits);
+      box.innerHTML = `<div class="alert bad">Required SGPA: <strong class="num">${fmt(req)}</strong> — target mathematically unachievable in one semester.<br>
+        Minimum semesters required (assuming a perfect 4.00 each term): <strong>${minSem || '—'}</strong>.</div>`;
+      comboCard.style.display = 'none';
+    } else {
+      box.innerHTML = `<div class="alert good">Required SGPA this semester: <strong class="num">${fmt(req)}</strong> across ${newCredits} credit hours to reach a ${fmt(target)} CGPA.</div>`;
+      const combo = L.suggestCombo(req, newCredits);
+      if (combo) {
+        comboOut.innerHTML = combo.map(c => `<div>• <strong>${c.letter}</strong> (${c.credits.toFixed(0)}-credit) — ${L.scale[c.letter].toFixed(1)} pts</div>`).join('');
+        comboCard.style.display = 'block';
+      } else comboCard.style.display = 'none';
+    }
+    save();
+  });
+
+  // ---------- Persistence ----------
+  function save() {
+    try {
+      localStorage.setItem('gradebook_v1', JSON.stringify({
+        curCGPA: $('#curCGPA').value, curCredits: $('#curCredits').value,
+        targetCGPA: $('#targetCGPA').value, targetCredits: $('#targetCredits').value,
+        scale: L.scale, courses: getCourses(),
+        past: Array.from({ length: 7 }, (_, i) => $('#past' + (i + 1))?.value || '')
+      }));
+    } catch (e) { /* storage unavailable — continue silently */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem('gradebook_v1');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (data.scale) Object.assign(L.scale, data.scale);
+      buildScaleTable();
+      $('#curCGPA').value = data.curCGPA ?? 3.30;
+      $('#curCredits').value = data.curCredits ?? 60;
+      $('#targetCGPA').value = data.targetCGPA ?? 3.50;
+      $('#targetCredits').value = data.targetCredits ?? 15;
+      (data.courses?.length ? data.courses : [{ name: '', credits: 3, grade: 'A' }])
+        .forEach(c => addCourseRow(c.name, c.credits, c.grade));
+      window.GradebookChart.buildPastRows();
+      (data.past || []).forEach((v, i) => { const el = $('#past' + (i + 1)); if (el) el.value = v; });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- Init ----------
+  window.Gradebook = { getCourses, save, fmt }; // small surface chart.js relies on
+  buildScaleTable();
+  if (!load()) {
+    addCourseRow('Data Structures', 3, 'A-');
+    addCourseRow('Linear Algebra', 3, 'B+');
+    addCourseRow('Technical Writing', 2, 'A');
+    window.GradebookChart.buildPastRows();
+  }
+  $('#curCGPA').addEventListener('input', () => { calcAndRenderSGPA(); save(); });
+  $('#curCredits').addEventListener('input', () => { calcAndRenderSGPA(); save(); });
+  $('#targetCGPA').addEventListener('input', save);
+  $('#targetCredits').addEventListener('input', save);
+  calcAndRenderSGPA();
+})();
