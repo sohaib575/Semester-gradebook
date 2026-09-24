@@ -1,10 +1,9 @@
 # Semester-gradebook
-Interactive semester GPA &amp; CGPA target planner — tracks current SGPA, calculates the exact grade needed to hit a target CGPA, and visualizes your trajectory with Chart.js. Pure HTML/CSS/JS, no backend.
 An interactive, logic-driven web tool that helps university students track semester performance, plan future grade targets, run "what-if" scenarios, and visualize their CGPA trajectory across semesters.
 
-No backend, no build step, no dependencies to install — pure HTML, CSS, and vanilla JavaScript. Open index.html and it runs.
+No backend, no build step, no dependencies to install — pure HTML, CSS, and JavaScript. Open index.html and it runs.
 
-✨ Features
+Features
 1. Course Entry & SGPA Calculation
 Add/remove unlimited courses with name, credit hours, and letter grade
 Fully editable 4.0 grading scale (change any point value and everything recalculates)
@@ -19,7 +18,7 @@ Chart.js line graph spanning Semester 1–8
 Historical CGPA — your entered past-semester values
 Projected path — where your CGPA is headed if you hit the required SGPA each future term
 Target threshold — a benchmark line at your goal CGPA
-🗂️ Project Structure
+Project Structure
 gradebook/
 ├── index.html    # Markup only
 ├── style.css     # Theming and layout
@@ -29,19 +28,14 @@ gradebook/
 
 Load order matters: logic.js → chart.js → ui.js (already set up correctly in index.html).
 
-🚀 Getting Started
-Clone or download this repo
-Keep all five files in the same folder
-Open index.html in any modern browser
-
-No npm install, no server required. (If your browser blocks local JS via file://, run: python -m http.server 8000, then visit http://localhost:8000.)
-
-🧮 Core Formula
+Core Formula
 required_SGPA = (target × (current_credits + new_credits) − current_CGPA × current_credits) / new_credits
 
 If required_SGPA > 4.00, the target can't be reached in a single semester — the app estimates the minimum number of semesters assuming a perfect 4.00 SGPA each term.
 
 🛠️ Tech Stack
-HTML5 + vanilla JavaScript (no framework)
+HTML
+CSS
+JavaScript
 Chart.js (via CDN) for the trajectory graph
 LocalStorage for per-device session persistence — nothing sent to a server
